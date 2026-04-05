@@ -47,7 +47,8 @@ action_schema:
   category: string [optional] enum[meeting_request, action_required, fyi, newsletter, spam, invoice, hr, legal, personal, complaint, approval_needed, other]
   email_id: string [optional]
   reply_body: string [optional] max_length:2000
-  tone: string [optional] enum[formal, friendly, assertive]
+  tone: string [optional] enum[formal, friendly, professional, brief, assertive]
+  tags: list[string] [optional] max_length:10
   followup_days: integer [optional] range[1,30]
   followup_note: string [optional] max_length:200
   flag_reason: string [optional] enum[vip, legal, urgent, awaiting_reply, needs_review]

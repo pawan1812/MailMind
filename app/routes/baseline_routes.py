@@ -17,5 +17,5 @@ def run_baseline():
             'manage_inbox':   {'score': 0.38, 'range': '0.31–0.46'},
         },
         'average': 0.577,
-        'note': 'Run baseline/run_baseline.py with OPENAI_API_KEY for live benchmark.',
+        'note': 'Run inference.py with HF_TOKEN for live benchmark.',
     }

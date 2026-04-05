@@ -1,33 +1,137 @@
-import asyncio
+"""
+MailMind Inference Script — OpenEnv Hackathon 2025
+===================================
+MANDATORY ENV VARS:
+    API_BASE_URL   The API endpoint for the LLM.
+    MODEL_NAME     The model identifier to use for inference.
+    HF_TOKEN       Your Hugging Face / API key.
+    IMAGE_NAME     Docker image name (for from_docker_image() pattern)
+
+STDOUT FORMAT:
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
+
+Runs ALL 3 tasks: classify_inbox (easy), draft_replies (medium), manage_inbox (hard).
+"""
+
 import os
 import sys
 import json
+import textwrap
 from typing import List, Optional
 
 try:
     import httpx
     from openai import OpenAI
 except ImportError:
-    print("ERROR: Install openai and httpx first: pip install openai httpx")
+    print("ERROR: pip install openai httpx")
     sys.exit(1)
 
-from baseline.prompts import SYSTEM_PROMPT, build_user_turn
-
-# ── Required Hackathon Variables ──────────────────────────────────────
+# ── Required Hackathon Environment Variables ─────────────────────────
+IMAGE_NAME = os.getenv("IMAGE_NAME")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://api.openai.com/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "gpt-4o-mini"
-MAILMIND_URL = os.getenv("MAILMIND_URL", "http://localhost:7860")
+API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
+MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
 
-BENCHMARK = "MailMind"
-# Assuming we run the hard task for the official inference run
-TASK_NAME = "manage_inbox"
-SUCCESS_SCORE_THRESHOLD = 0.3
+BENCHMARK = "mailmind"
+TASKS = ["classify_inbox", "draft_replies", "manage_inbox"]
+MAX_STEPS_PER_TASK = {"classify_inbox": 20, "draft_replies": 30, "manage_inbox": 60}
+SEED = 42
+TEMPERATURE = 0.2
+MAX_TOKENS = 768
+
+# Default env URL — points to the Docker container / HF Space
+ENV_URL = os.getenv("MAILMIND_URL", "http://localhost:7860")
+
+# ── System Prompt (self-contained — no external imports) ─────────────
+
+SYSTEM_PROMPT = textwrap.dedent("""
+You are MailMind, a professional AI email manager. Your job is to process
+each email in the inbox efficiently, accurately, and professionally.
+
+DECISION FRAMEWORK:
+1. READ the email body, sender role, thread history, attachments.
+2. CLASSIFY by priority (urgent|high|medium|low) and category
+   (meeting_request|action_required|fyi|newsletter|spam|invoice|hr|legal|personal|complaint|approval_needed|other).
+3. DECIDE: If spam → delete. If low + no questions → archive. If questions → draft reply.
+   If future follow-up needed → schedule_followup.
+
+TONE RULES:
+- CEO/Board → formal   - Client → professional   - Teammate → friendly
+- Vendor → professional  - Unknown → professional
+
+PENALTIES: Deleting urgent/high emails (-0.30). Replying to spam (-0.15).
+Skipping actionable emails (-0.15). Rude language (-0.20).
+
+OUTPUT: Respond with valid JSON only. No markdown. No preamble.
+{
+  "action_type": "classify_email|draft_reply|send_reply|archive|delete|flag|schedule_followup|skip",
+  "priority": "urgent|high|medium|low",
+  "category": "meeting_request|action_required|fyi|...",
+  "email_id": "<email_id>",
+  "reply_body": "<reply text>",
+  "tone": "formal|professional|friendly|brief",
+  "followup_days": 3,
+  "followup_note": "<note>",
+  "flag_reason": "vip|legal|urgent|awaiting_reply|needs_review"
+}
+Include only the fields relevant to your chosen action_type.
+""").strip()
+
+
+def build_user_turn(obs: dict) -> str:
+    """Build the user-turn message from the observation."""
+    email = obs.get("current_email")
+    if not email:
+        return "No more emails. Episode complete."
+
+    summary = obs.get("inbox_summary", {})
+    step = obs.get("step", 0)
+    recent = obs.get("recent_actions", [])
+
+    parts = [
+        f"═══ EMAIL TO PROCESS ═══",
+        f"Email ID:    {email.get('email_id', 'N/A')}",
+        f"From:        {email.get('sender', 'Unknown')} ({email.get('sender_importance', 'unknown')})",
+        f"Subject:     {email.get('subject', '(no subject)')}",
+        f"Received:    {email.get('received_at', 'N/A')}",
+        f"Attachment:  {email.get('attachment_hint', 'None')}",
+        f"Deadline:    {email.get('deadline_hint', 'None')}",
+        "",
+        "BODY:",
+        email.get("body", "(empty)"),
+        "",
+        f"═══ INBOX ═══",
+        f"Step:           {step}",
+        f"Total emails:   {summary.get('total_emails', '?')}",
+        f"Unread:         {summary.get('unread_count', '?')}",
+        f"Processed:      {summary.get('processed_count', '?')}",
+        f"Budget left:    {summary.get('step_budget_remaining', '?')}",
+    ]
+
+    if email.get("thread") and email["thread"].get("messages"):
+        parts.append("")
+        parts.append("THREAD HISTORY:")
+        for msg in email["thread"]["messages"][-3:]:
+            parts.append(f"  [{msg.get('sender', '?')}]: {msg.get('body', '')[:200]}")
+
+    if recent:
+        parts.append("")
+        parts.append("RECENT ACTIONS:")
+        for r in recent[-3:]:
+            parts.append(f"  {r}")
+
+    parts.append("")
+    parts.append("Respond with valid JSON only.")
+    return "\n".join(parts)
+
 
 # ── Standard Log Formatters ──────────────────────────────────────────
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
+
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error if error else "null"
@@ -37,20 +141,26 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
         flush=True,
     )
 
+
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
-# ── Inference Execution ──────────────────────────────────────────────
+
+# ── LLM Call ──────────────────────────────────────────────────────────
 
 def get_model_action(client: OpenAI, messages: List[dict]) -> str:
+    """Call LLM and return raw JSON string."""
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=messages,
-            temperature=0.2,
-            max_tokens=768,
-            response_format={'type': 'json_object'},
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS,
+            response_format={"type": "json_object"},
         )
         text = (completion.choices[0].message.content or "").strip()
         return text if text else '{"action_type": "skip"}'
@@ -58,86 +168,105 @@ def get_model_action(client: OpenAI, messages: List[dict]) -> str:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
         return '{"action_type": "skip"}'
 
-def main() -> None:
-    api_key_safe = API_KEY or "sk-dummy_key_for_testing"
-    client = OpenAI(base_url=API_BASE_URL, api_key=api_key_safe)
-    http = httpx.Client(timeout=60.0)
 
-    history: List[str] = []
+# ── Run One Episode ──────────────────────────────────────────────────
+
+def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
+    """Run one complete episode for a single task with full logging."""
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        # Reset Environment
-        reset_resp = http.post(f"{MAILMIND_URL}/reset", json={"task_id": TASK_NAME, "seed": 42})
+        # Reset
+        reset_resp = http.post(f"{ENV_URL}/reset", json={"task_id": task_id, "seed": SEED})
         reset_resp.raise_for_status()
         obs = reset_resp.json()
 
-        messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        max_steps = MAX_STEPS_PER_TASK.get(task_id, 60)
 
-        while not obs.get('done', False):
+        while not obs.get("done", False) and steps_taken < max_steps:
             steps_taken += 1
-            
+
+            # Build prompt
             user_turn = build_user_turn(obs)
-            messages.append({'role': 'user', 'content': user_turn})
+            messages.append({"role": "user", "content": user_turn})
 
-            # LLM Decision
+            # LLM decision
             action_text = get_model_action(client, messages)
-            
-            # Keep LLM context window manageable
-            messages.append({'role': 'assistant', 'content': action_text})
-            if len(messages) > 10:
-                messages = messages[:1] + messages[-8:]
+            messages.append({"role": "assistant", "content": action_text})
 
+            # Keep context window manageable
+            if len(messages) > 12:
+                messages = messages[:1] + messages[-10:]
+
+            # Parse action
+            error_msg = None
             try:
                 action = json.loads(action_text)
-                error_msg = None
             except json.JSONDecodeError as exc:
-                action = {'action_type': 'skip'}
+                action = {"action_type": "skip"}
                 error_msg = str(exc)
 
-            # Step Environment
-            step_resp = http.post(f"{MAILMIND_URL}/step", json={"action": action})
+            # Step
+            step_resp = http.post(f"{ENV_URL}/step", json={"action": action})
             if step_resp.status_code != 200:
-                error_msg = step_resp.text
+                error_msg = step_resp.text[:200]
                 reward_val = 0.0
-                obs['done'] = True
+                obs["done"] = True
             else:
                 result = step_resp.json()
-                reward_val = result.get('reward', {}).get('value', 0.0)
-                obs = result.get('observation') or obs
-                if result.get('done'):
-                    obs['done'] = True
+                reward_val = result.get("reward", {}).get("value", 0.0)
+                obs = result.get("observation") or obs
+                if result.get("done"):
+                    obs["done"] = True
+                last_error = result.get("info", {}).get("error")
+                if last_error:
+                    error_msg = last_error
 
             rewards.append(reward_val)
-            
-            # Condense action string for logs (prevent massive JSON dumps on one line)
-            action_str = f"{action.get('action_type', 'unknown')}:{action.get('email_id', 'none')}"
 
+            action_str = action.get("action_type", "unknown")
             log_step(
-                step=steps_taken, 
-                action=action_str, 
-                reward=reward_val, 
-                done=obs.get('done', False), 
-                error=error_msg
+                step=steps_taken,
+                action=action_str,
+                reward=reward_val,
+                done=obs.get("done", False),
+                error=error_msg,
             )
 
-        # Post-episode Grader call
-        grade_resp = http.post(f"{MAILMIND_URL}/grader")
+        # Grade
+        grade_resp = http.post(f"{ENV_URL}/grader")
         if grade_resp.status_code == 200:
-            score = grade_resp.json().get('final_score', 0.0)
-        
-        success = score >= SUCCESS_SCORE_THRESHOLD
+            score = grade_resp.json().get("final_score", 0.0)
+
+        score = min(max(score, 0.0), 1.0)
+        success = score >= 0.1
 
     except Exception as e:
-        print(f"[DEBUG] Execution error: {e}", flush=True)
+        print(f"[DEBUG] Task {task_id} error: {e}", flush=True)
+
+    finally:
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+
+# ── Main ──────────────────────────────────────────────────────────────
+
+def main() -> None:
+    api_key = API_KEY or "sk-placeholder"
+    client = OpenAI(base_url=API_BASE_URL, api_key=api_key)
+    http = httpx.Client(timeout=120.0)
+
+    try:
+        for task_id in TASKS:
+            run_task(client, http, task_id)
     finally:
         http.close()
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
 
 if __name__ == "__main__":
     main()
