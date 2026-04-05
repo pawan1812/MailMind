@@ -1,0 +1,49 @@
+# Virtual environments
+venv/
+venv2/
+.venv/
+env/
+
+# Git
+.git/
+.github/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Environment files
+.env
+.env.local
+*.env.local
+
+# Test artifacts
+tests/__pycache__/
+tests/results.txt
+tests/pytest_results.txt
+.pytest_cache/
+test_hf_space.py
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Firebase credentials
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+
+# Planning / agent dirs
+.planning/
+.gemini/
+.agents/
+
+# Logs
+*.log
+install.log

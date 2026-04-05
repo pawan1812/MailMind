@@ -35,6 +35,8 @@ desktop.ini
 
 # Test output
 tests/results.txt
+tests/pytest_results.txt
+test_hf_space.py
 
 # Firebase credentials (NEVER commit these)
 firebase-service-account.json

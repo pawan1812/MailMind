@@ -44,7 +44,7 @@ TEMPERATURE = 0.2
 MAX_TOKENS = 768
 
 # Default env URL — points to the Docker container / HF Space
-ENV_URL = os.getenv("MAILMIND_URL", "http://localhost:7860")
+ENV_URL = os.getenv("OPENENV_BASE_URL", os.getenv("MAILMIND_URL", "http://localhost:7860"))
 
 # ── System Prompt (self-contained — no external imports) ─────────────
 
@@ -136,18 +136,22 @@ def log_start(task: str, env: str, model: str) -> None:
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    error_val = error if error else "null"
+    if error:
+        err_clean = str(error).replace('\n', ' ').replace('\r', ' ').strip()
+        error_val = f'"{err_clean}"'
+    else:
+        error_val = "null"
     done_val = str(done).lower()
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        f"[STEP]  step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
         flush=True,
     )
 
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
     print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        f"[END]   success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -167,7 +171,7 @@ def get_model_action(client: OpenAI, messages: List[dict]) -> str:
         text = (completion.choices[0].message.content or "").strip()
         return text if text else '{"action_type": "skip"}'
     except Exception as exc:
-        print(f"[DEBUG] Model request failed: {exc}", flush=True)
+        print(f"[DEBUG] Model request failed: {exc}", file=sys.stderr, flush=True)
         return '{"action_type": "skip"}'
 
 
@@ -186,9 +190,11 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
         # Reset
         reset_resp = http.post(f"{ENV_URL}/reset", json={"task_id": task_id, "seed": SEED})
         reset_resp.raise_for_status()
+        session_id = reset_resp.headers.get("X-Session-ID", "default")
         obs = reset_resp.json()
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        headers = {"X-Session-ID": session_id}
         max_steps = MAX_STEPS_PER_TASK.get(task_id, 60)
 
         while not obs.get("done", False) and steps_taken < max_steps:
@@ -210,14 +216,20 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
             error_msg = None
             try:
                 action = json.loads(action_text)
-            except json.JSONDecodeError as exc:
+                if not isinstance(action, dict):
+                    error_msg = f"Model returned {type(action).__name__}, expected dict"
+                    action = {"action_type": "skip"}
+            except Exception as exc:
                 action = {"action_type": "skip"}
                 error_msg = str(exc)
 
+            if not action.get("action_type"):
+                action["action_type"] = "skip"
+
             # Step
-            step_resp = http.post(f"{ENV_URL}/step", json={"action": action})
+            step_resp = http.post(f"{ENV_URL}/step", json={"action": action}, headers=headers)
             if step_resp.status_code != 200:
-                error_msg = step_resp.text[:200]
+                error_msg = step_resp.text[:200].replace('\n', ' ')
                 reward_val = 0.0
                 obs["done"] = True
             else:
@@ -242,7 +254,7 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
             )
 
         # Grade
-        grade_resp = http.post(f"{ENV_URL}/grader")
+        grade_resp = http.post(f"{ENV_URL}/grader", headers=headers)
         if grade_resp.status_code == 200:
             score = grade_resp.json().get("final_score", 0.0)
 
@@ -250,7 +262,7 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
         success = score >= 0.1
 
     except Exception as e:
-        print(f"[DEBUG] Task {task_id} error: {e}", flush=True)
+        print(f"[DEBUG] Task {task_id} error: {e}", file=sys.stderr, flush=True)
 
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
