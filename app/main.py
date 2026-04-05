@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from app.config import settings
 
 
@@ -55,6 +55,11 @@ def create_app() -> FastAPI:
     app.include_router(grader_routes.router)
     app.include_router(baseline_routes.router)
     app.include_router(health_routes.router)
+
+    # Root redirect → Swagger UI (HuggingFace opens / by default)
+    @app.get('/', include_in_schema=False)
+    def root():
+        return RedirectResponse(url='/docs')
 
     # Serve openenv.yaml
     @app.get('/openenv.yaml', include_in_schema=False)
