@@ -1,3 +1,16 @@
+---
+title: MailMind AI Agent
+emoji: 📧
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+license: apache-2.0
+app_port: 7860
+tags:
+  - openenv
+---
+
 # 📧 MailMind — OpenEnv Environment
 
 > **Email Triage & Response AI Agent — OpenEnv Reinforcement Learning Environment**
