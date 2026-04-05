@@ -2,10 +2,10 @@
 MailMind Inference Script — OpenEnv Hackathon 2025
 ===================================
 MANDATORY ENV VARS:
-    API_BASE_URL   The API endpoint for the LLM.
-    MODEL_NAME     The model identifier to use for inference.
-    HF_TOKEN       Your Hugging Face / API key.
-    IMAGE_NAME     Docker image name (for from_docker_image() pattern)
+    API_BASE_URL       The API endpoint for the LLM.
+    MODEL_NAME         The model identifier to use for inference.
+    HF_TOKEN           Your Hugging Face / API key.
+    LOCAL_IMAGE_NAME   The name of the local Docker image (optional, for from_docker_image())
 
 STDOUT FORMAT:
     [START] task=<task_name> env=<benchmark> model=<model_name>
@@ -29,10 +29,12 @@ except ImportError:
     sys.exit(1)
 
 # ── Required Hackathon Environment Variables ─────────────────────────
-IMAGE_NAME = os.getenv("IMAGE_NAME")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
+
+# Optional — if you use from_docker_image():
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 BENCHMARK = "mailmind"
 TASKS = ["classify_inbox", "draft_replies", "manage_inbox"]
@@ -257,8 +259,7 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
 # ── Main ──────────────────────────────────────────────────────────────
 
 def main() -> None:
-    api_key = API_KEY or "sk-placeholder"
-    client = OpenAI(base_url=API_BASE_URL, api_key=api_key)
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     http = httpx.Client(timeout=120.0)
 
     try:
