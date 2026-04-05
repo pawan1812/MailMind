@@ -117,23 +117,29 @@ class MailMindEnv:
         }
 
     def grade(self) -> GraderResult:
-        """Grade the completed episode."""
+        """Grade the completed episode using task-specific graders."""
         if self.episode is None:
             raise RuntimeError('No episode to grade')
 
         ep = self.episode
         gt = ep.ground_truth
+
+        # Use modular graders
+        from app.core.graders import GRADERS
+        grader_cls = GRADERS.get(ep.task_id)
+        if grader_cls:
+            grader = grader_cls()
+            result = grader.grade(ep)
+        else:
+            result = {'score': 0.0}
+
+        # Compute component scores using both inline and module results
         weights = GRADER_WEIGHTS.get(ep.task_id, GRADER_WEIGHTS['classify_inbox'])
 
-        # Classification score
         cls_score = self._grade_classifications(ep, gt)
-        # Reply score
         reply_score = self._grade_replies(ep, gt)
-        # Archive score
         archive_score = self._grade_archives(ep, gt)
-        # Followup score
         followup_score = self._grade_followups(ep, gt)
-        # Injection score
         injection_score = self._grade_injections(ep)
 
         component_scores = {
@@ -164,7 +170,18 @@ class MailMindEnv:
                                         if gt.get(d, {}).get('category') not in ('spam', 'newsletter')]) * 0.05, 4),
         }
 
-        final_score = max(0.0, min(1.0, final - waste_pen - deadline_pen))
+        # Episode bonuses (PRD §5.2)
+        completion = len(ep.processed_emails) / len(ep.inbox) if ep.inbox else 0
+        bonus = 0.0
+        if completion >= 0.95:
+            bonus += 0.05  # Inbox completion
+        wrong_del = [d for d in ep.deletions if gt.get(d, {}).get('category') not in ('spam', 'newsletter')]
+        if not wrong_del:
+            bonus += 0.02  # Zero wrong deletions
+        if ep.step < ep.max_steps * 0.7 and completion >= 0.90:
+            bonus += 0.03  # Time efficiency
+
+        final_score = max(0.0, min(1.0, final + bonus - waste_pen - deadline_pen))
 
         return GraderResult(
             episode_id=ep.episode_id,

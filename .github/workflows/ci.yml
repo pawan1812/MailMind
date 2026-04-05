@@ -1,0 +1,65 @@
+name: MailMind CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+
+      - name: Run tests
+        run: python -m pytest tests/test_mailmind.py -v --tb=short
+
+      - name: Verify server starts
+        run: |
+          python -m uvicorn app.main:app --host 0.0.0.0 --port 7860 &
+          sleep 3
+          curl -f http://localhost:7860/health || exit 1
+          curl -f http://localhost:7860/tasks || exit 1
+          echo "Server health check passed"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint
+        run: ruff check app/ baseline/ tests/ --select E,W,F --ignore E501
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t mailmind:test .
+      - name: Test Docker container
+        run: |
+          docker run -d -p 7860:7860 --name mailmind-test mailmind:test
+          sleep 5
+          curl -f http://localhost:7860/health || exit 1
+          docker stop mailmind-test

@@ -24,11 +24,13 @@ class Action(BaseModel):
         'meeting_request', 'action_required', 'fyi', 'newsletter',
         'spam', 'invoice', 'hr', 'legal', 'personal',
         'complaint', 'approval_needed', 'other']] = None
+    tags: Optional[list[str]] = Field(None, max_length=10,
+        description="Free-form tags: ['meeting','invoice','deadline',...]")
 
     # draft_reply / send_reply
     email_id: Optional[str] = None
     reply_body: Optional[str] = Field(None, max_length=2000)
-    tone: Optional[Literal['formal', 'friendly', 'assertive']] = None
+    tone: Optional[Literal['formal', 'friendly', 'professional', 'brief', 'assertive']] = None
 
     # schedule_followup
     followup_days: Optional[int] = Field(None, ge=1, le=30)
