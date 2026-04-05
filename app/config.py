@@ -1,9 +1,12 @@
 """MailMind configuration via pydantic-settings."""
 
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     # App
     app_name: str = "MailMind OpenEnv"
     app_version: str = "2.0.0"
@@ -24,8 +27,5 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 7860
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 settings = Settings()
+

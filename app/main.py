@@ -1,9 +1,31 @@
 """MailMind OpenEnv — Main application factory. PRD §13.1."""
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from app.config import settings
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Modern lifespan handler — replaces deprecated on_event."""
+    # Startup
+    try:
+        from app.db.firebase_client import get_firestore_client
+        client = get_firestore_client()
+        if client:
+            print("Firebase Firestore connected")
+        else:
+            print("Firebase not configured -- using in-memory storage")
+    except Exception:
+        print("Firebase not available -- using in-memory storage")
+
+    print(f"MailMind OpenEnv v{settings.app_version} started on port {settings.port}")
+    yield
+    # Shutdown
+    print("MailMind shutting down")
+
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -13,6 +35,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         docs_url='/docs',
         redoc_url='/redoc',
+        lifespan=lifespan,
     )
 
     # CORS (required for HF Spaces iframe)
@@ -39,21 +62,6 @@ def create_app() -> FastAPI:
         import os
         yaml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'openenv.yaml')
         return FileResponse(yaml_path, media_type='text/yaml')
-
-    @app.on_event('startup')
-    async def startup():
-        # Try Firebase connection (non-blocking)
-        try:
-            from app.db.firebase_client import get_firestore_client
-            client = get_firestore_client()
-            if client:
-                print(f"✅ Firebase Firestore connected")
-            else:
-                print(f"⚠️  Firebase not configured — using in-memory storage")
-        except Exception:
-            print(f"⚠️  Firebase not available — using in-memory storage")
-
-        print(f"🚀 {settings.app_name} v{settings.app_version} started on port {settings.port}")
 
     return app
 

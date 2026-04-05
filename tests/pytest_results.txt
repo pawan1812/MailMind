@@ -1,0 +1,18 @@
+﻿.\venv\Scripts\python.exe : 
+D:\all projects\scaller school\ma
+ilmind\venv\Scripts\python.exe: 
+No module named pytest
+At line:1 char:1
++ .\venv\Scripts\python.exe -m 
+pytest tests\test_mailmind.py -v 
+2>&1 |  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo          : No 
+   tSpecified: (D:\all projects  
+  ...le named pytest:String) [   
+ ], RemoteException
+    + FullyQualifiedErrorId : Na 
+   tiveCommandError
+ 
