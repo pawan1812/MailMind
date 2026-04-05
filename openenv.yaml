@@ -1,0 +1,59 @@
+# openenv.yaml — MailMind v2.0 OpenEnv Specification
+name: mailmind
+version: '2.0.0'
+description: >
+  Full enterprise email triage and response environment.
+  An AI agent classifies, replies, archives, flags, and schedules
+  follow-ups across three difficulty levels in a simulated inbox.
+  Features dynamic email injection, semantic reply grading, and
+  optional Firebase Firestore persistence.
+tags: [openenv, email, nlp, productivity, rl-benchmark, agent-benchmark]
+
+author: MailMind Team
+license: Apache-2.0
+python: '>=3.11'
+
+endpoints:
+  reset:    POST /reset
+  step:     POST /step
+  state:    GET  /state
+  tasks:    GET  /tasks
+  grader:   POST /grader
+  baseline: POST /baseline
+  health:   GET  /health
+
+tasks:
+  - id: classify_inbox
+    name: Email Classification
+    difficulty: easy
+    max_steps: 20
+    description: Classify all inbox emails by priority and category
+
+  - id: draft_replies
+    name: Reply Drafting
+    difficulty: medium
+    max_steps: 30
+    description: Classify and draft context-appropriate replies with correct tone
+
+  - id: manage_inbox
+    name: Full Inbox Management
+    difficulty: hard
+    max_steps: 60
+    description: Complete inbox lifecycle with dynamic email injection
+
+action_schema:
+  action_type: string [required] enum[classify_email, draft_reply, send_reply, archive, delete, flag, schedule_followup, skip]
+  priority: string [optional] enum[urgent, high, medium, low]
+  category: string [optional] enum[meeting_request, action_required, fyi, newsletter, spam, invoice, hr, legal, personal, complaint, approval_needed, other]
+  email_id: string [optional]
+  reply_body: string [optional] max_length:2000
+  tone: string [optional] enum[formal, friendly, assertive]
+  followup_days: integer [optional] range[1,30]
+  followup_note: string [optional] max_length:200
+  flag_reason: string [optional] enum[vip, legal, urgent, awaiting_reply, needs_review]
+
+reward:
+  range: [-0.5, 0.5]
+  dense: true
+  terminal_bonus: true
+  breakdown: true

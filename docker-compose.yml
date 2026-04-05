@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  mailmind:
+    build: .
+    ports:
+      - '7860:7860'
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=info
+      # Firebase (optional — uncomment and set values for persistence)
+      # - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON}
+      # - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      # OpenAI (optional — only for /baseline endpoint)
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_MODEL=gpt-4o-mini
+    volumes:
+      - ./app:/app/app

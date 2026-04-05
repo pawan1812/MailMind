@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+venv2/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+*.env.local
+
+# Logs
+*.log
+install.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test output
+tests/results.txt
+
+# Firebase credentials (NEVER commit these)
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+
+# Docker
+.dockerignore
+
+# Planning / agent dirs
+.planning/
+.gemini/
+.agents/

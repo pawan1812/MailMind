@@ -1,0 +1,35 @@
+[
+    {
+        "template_id": "urgent_client_issue",
+        "subject": "System Outage - URGENT",
+        "body_template": "Hello {{ receiver_name }},\n\nOur service has been down for the last {{ random_hours }} hours and it is impacting our users. When will this be fixed?\n\nBest,\n{{ sender_name }}",
+        "priority": "urgent",
+        "category": "client",
+        "tags": ["outage", "urgent"],
+        "expected_tone": "professional",
+        "requires_reply": true,
+        "requires_schedule": false
+    },
+    {
+        "template_id": "team_lunch",
+        "subject": "Lunch today?",
+        "body_template": "Hey,\nAnyone want to grab pizza for lunch around 12:30?\n\nCheers,\n{{ sender_name }}",
+        "priority": "low",
+        "category": "internal",
+        "tags": ["social", "lunch"],
+        "expected_tone": "friendly",
+        "requires_reply": false,
+        "requires_schedule": false
+    },
+    {
+        "template_id": "board_deck_due",
+        "subject": "Board Deck Missing Slides",
+        "body_template": "{{ receiver_name }},\nWe need the missing Q3 slides for the board deck by EOD. Please confirm when ready.\n\nThanks,\n{{ sender_name }} (CEO)",
+        "priority": "urgent",
+        "category": "internal",
+        "tags": ["deck", "deadline"],
+        "expected_tone": "formal",
+        "requires_reply": true,
+        "requires_schedule": false
+    }
+]

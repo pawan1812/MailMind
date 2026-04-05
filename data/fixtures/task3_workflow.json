@@ -1,0 +1,39 @@
+[
+    {
+        "template_id": "hr_policy_update",
+        "subject": "New WFH Policy 2026",
+        "body_template": "Hi everyone,\nPlease review the attached document for the updated work-from-home policy starting next month. No action required unless you have specific accommodations.\n\nHR Dep.",
+        "priority": "low",
+        "category": "hr",
+        "tags": ["policy", "FYI"],
+        "expected_tone": "formal",
+        "requires_reply": false,
+        "requires_schedule": false,
+        "thread_history": []
+    },
+    {
+        "template_id": "meeting_schedule_request",
+        "subject": "Sync next Tuesday?",
+        "body_template": "Hey {{ receiver_name }},\nAre you free next Tuesday afternoon to go over the Q4 projections? Can we aim for 2pm EST?\n\nThanks,\n{{ sender_name }}",
+        "priority": "normal",
+        "category": "internal",
+        "tags": ["meeting", "schedule"],
+        "expected_tone": "friendly",
+        "requires_reply": true,
+        "requires_schedule": true,
+        "expected_schedule_delta": 144, 
+        "thread_history": []
+    },
+    {
+        "template_id": "legal_signature_due",
+        "subject": "URGENT - Signature Required",
+        "body_template": "{{ receiver_name }},\nThe NDA for Project Horizon must be signed before close of business today, or the deal stalls. Link enclosed.\n\nLegal Team",
+        "priority": "urgent",
+        "category": "legal",
+        "tags": ["NDA", "signature", "deadline"],
+        "expected_tone": "formal",
+        "requires_reply": true,
+        "requires_schedule": false,
+        "thread_history": []
+    }
+]

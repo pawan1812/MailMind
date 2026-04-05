@@ -1,0 +1,32 @@
+[
+    {
+        "template_id": "vendor_contract_renewal",
+        "subject": "Re: Contract Renewal 2026",
+        "body_template": "Hi {{ receiver_name }},\nFollowing up on my previous email. If we don't renew by Friday, we will lose access to the API sandbox. Please let me know your decision.\n\nBest,\n{{ sender_name }}",
+        "priority": "high",
+        "category": "vendor",
+        "tags": ["renewal", "API", "urgent"],
+        "expected_tone": "professional",
+        "requires_reply": true,
+        "requires_schedule": false,
+        "thread_history": [
+            "We are approaching the end of our current term. Attached is the proposal for 2026.",
+            "Thanks, we will review the proposal this week."
+        ]
+    },
+    {
+        "template_id": "client_complaint_thread",
+        "subject": "Re: Issue with Invoice #3499",
+        "body_template": "Hello {{ receiver_name }},\nYou mentioned you would credit the overcharge, but my new invoice still shows the incorrect amount. Can you look into this immediately?\n\nRegards,\n{{ sender_name }}",
+        "priority": "urgent",
+        "category": "client",
+        "tags": ["invoice", "complaint", "billing"],
+        "expected_tone": "professional",
+        "requires_reply": true,
+        "requires_schedule": false,
+        "thread_history": [
+            "Invoice #3499 seems to double bill for consulting hours.",
+            "I apologize for the oversight. We will credit this back on your next statement."
+        ]
+    }
+]

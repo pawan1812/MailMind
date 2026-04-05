@@ -1,0 +1,27 @@
+{
+    "CEO": {
+        "tone": "formal",
+        "description": "The Chief Executive Officer. Expects concise, highly professional responses.",
+        "urgency_multiplier": 1.5
+    },
+    "Client": {
+        "tone": "professional",
+        "description": "External client or customer. Expects warm, solution-focused, and professional tone.",
+        "urgency_multiplier": 1.2
+    },
+    "Teammate": {
+        "tone": "friendly",
+        "description": "Internal team member. Friendly, direct, collaborative.",
+        "urgency_multiplier": 1.0
+    },
+    "Vendor": {
+        "tone": "professional",
+        "description": "Third-party vendor. Professional, clear boundary-setting.",
+        "urgency_multiplier": 0.8
+    },
+    "Unknown": {
+        "tone": "professional",
+        "description": "Unknown sender. Neutral and polite.",
+        "urgency_multiplier": 1.0
+    }
+}
