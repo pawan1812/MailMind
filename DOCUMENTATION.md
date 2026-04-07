@@ -1,76 +1,53 @@
-# MailMind: Extended Architectural & Operations Guide
+# 📧 MailMind: A Simple Guide
 
-## 📌 1. What is MailMind?
-MailMind is a production-grade **OpenEnv-compatible Reinforcement Learning Environment** that simulates an enterprise email management ecosystem. Unlike synthetic multiple-choice tests, MailMind forces AI agents to traverse a multi-turn, state-heavy environment. It bridges the gap between text-based reasoning models and practical workflow agents. 
+Welcome! This guide explains how to easily understand and use **MailMind**. 
 
-You build an AI agent and connect it to MailMind's HTTP REST Sandbox. Your agent "reads" emails, tracks a "budget" of time (max steps), and emits precise tool commands (JSONs) to classify priorities, formulate corporate-toned replies, schedule calendar follow-ups, and react dynamically to sudden urgent inbox injections (like a sudden server-down alert).
-
----
-
-## 🏆 2. Project Scores (Baseline Evaluation)
-According to the built-in OpenEnv validation baseline runs using **`gpt-4o-mini` (temperature `0.2`)**, here are the base performance benchmarks out of a maximum of **`1.0`**:
-
-| Task ID | Difficulty | Baseline Avg Score | Variance Constraints |
-| :--- | :--- | :--- | :--- |
-| **`classify_inbox`** | 🟢 Easy | `0.7745` | Standard deviation ~0.04 |
-| **`draft_replies`** | 🟡 Medium | `0.5820` | Captures semantics/tone matching |
-| **`manage_inbox`** | 🔴 Hard | `0.3855` | Missed deadlines & urgent deletes scale penalties |
-| **✨ Global Avg** | --- | **`0.5806`** | --- |
+Think of MailMind as a flight simulator, but for an email inbox. You can plug your AI bot into MailMind to see how well it classifies emails, writes replies, and handles urgent tasks.
 
 ---
 
-## ⚙️ 3. How MailMind Works Inside
-At its core, MailMind acts as a state machine simulating time passing, an unread email stack, and user constraints.
+## 🎯 1. The Core Idea
+When you connect to MailMind, your AI acts as an executive assistant. We offer 3 different challenges:
 
-### 🔄 The REST Lifecycle
-1. **Initialization (`POST /reset`)**
-   Your agent requests a new session containing a `task_id` (e.g., `manage_inbox`) and a `seed`. MailMind's **InboxSimulator** engine builds a deterministic inbox using `Faker` and complex Jinja templates, generating between 15-45 emails (newsletters, angry clients, internal HR requests) with hidden "ground truths".
+* **🟢 Easy Task (`classify_inbox`)**: The AI just needs to read 15 emails and tag them correctly (e.g., "Urgent", "Spam", "Meeting").
+* **🟡 Medium Task (`draft_replies`)**: The AI needs to read 25 emails and actually write fitting replies based on who sent them.
+* **🔴 Hard Task (`manage_inbox`)**: The AI gets 40 emails plus surprise "urgent alerts" that pop up mid-session! The AI must react quickly before deadlines expire.
 
-2. **Observation (`GET /state`)**
-   MailMind hands your agent an `Observation` context. It includes:
-   * **The Current Email Details:** Who sent it, thread history, subject, attachments.
-   * **Inbox Meta-State:** Number of emails unread, total steps remaining in the "clock budget", how many high-priority emails exist.
-
-3. **Execution (`POST /step`)**
-   The AI reads the Observation and generates a strictly formatted JSON action:
-   ```json
-   {
-      "action_type": "draft_reply",
-      "email_id": "em_x29A",
-      "reply_body": "Hello John, checking on the Q3 metrics.",
-      "tone": "professional"
-   }
-   ```
-   
-4. **Intermediate Scoring (Dense Rewards)**
-   Instead of waiting roughly 40 turns to tell your AI if it passed, the `RewardCalculator` evaluates every single action immediately via dense rewards bounding between `[-0.5, 0.5]`. 
-   * *Example:* Scheduling a follow up in the correct time window yields `+0.15`.
-   * *Example:* Deleting an urgent client email triggers a severe penalty `-0.30`.
-
-5. **Final Evaluation (`POST /grader`)**
-   At exhaustion (reaching max steps or empty inbox), the OpenEnv grading pipeline consolidates everything—time efficiency, classification mismatches, tone alignments—into one normalized scalar score `[0.0, 1.0]`.
+**What is a good score?**
+A top-tier AI should aim for a score near **`1.0`**. For reference, base AI models (like GPT-4o-Mini) currently score about **`0.58`** on average across all tasks.
 
 ---
 
-## 🌊 4. How to Create an AI Agent Flow for MailMind
-If you are designing the AI Agent that connects to MailMind, here is the architectural strategy required to succeed at navigating this flow effectively:
+## 🔌 2. Understanding the Interface (How to connect)
 
-### Step A: System Prompt Design
-Your logic model must act as an executive assistant. Pre-prompt the agent with a firm "Decision Framework":
-* **Read Phase:** Analyze sender domain (`@gmail.com` vs `@internal.corp`).
-* **Categorization Rule:** Immediately guess if this requires scheduling via the calendar or if it is a general broadcast newsletter.
-* **Tone enforcement:** "If addressing the CEO, tone MUST be `formal`; if internal peers, use `friendly`."
+MailMind isn't a complex software—it's just a simple web API! Your code talks to MailMind using simple web requests. Here is the 4-step loop you need to build:
 
-### Step B: The Agent Loop Process Flow
-An optimal custom agent loop inside your inference script should look like this:
+### Step 1: Start the Game (`POST /reset`)
+You tell MailMind: *"Start the Medium task!"* 
+MailMind generates a brand new inbox filled with fake emails specifically designed for testing, and hands you the first email.
 
-1. **Start the Loop (`while not done:`)**
-2. **Fetch Screen:** Retrieve `current_email` from the observation list.
-3. **Internal Reasoning (Optional but Recommended):** Make your LLM output a raw text "thought" block before dumping the JSON. Have the LLM ask: *“Is this urgent? Yes. Does it need a reply now? No, just scheduled.”*
-4. **Commit API Action:** Fire off the `/step` interaction. Parse the dense `reward` value returned.
-5. **Adjust Dynamically:** If the environment returns a negative reward `(-0.15)` for an action, inject that feedback into the agent's context history so the agent learns mid-session to not repeat that mistake.
+### Step 2: Read the Screen (`GET /state`)
+You ask MailMind: *"What's going on?"*
+MailMind replies with all the details: The email subject, who sent it, the full message body, and how many tasks you have left to do.
 
-### Step C: Handling "Hard Mode" Dynamics (Dynamic Injections)
-During the `manage_inbox` task, emails arrive dynamically—simulating real-time alerts. 
-* Your agent must keep an eye on `inbox_summary['unread_count']` spikes. 
-* Your flow must support pausing its current linear traversal to prioritize and switch over to resolving incoming `urgent` flag injections (e.g., server down tickets) before deadlines expire, or it will rapidly bleed baseline points.
+### Step 3: Take Action (`POST /step`)
+Now your AI decides what to do. You send MailMind a simple JSON action. For example:
+```json
+{
+   "action_type": "draft_reply",
+   "reply_body": "Hi there, I will review the Q3 budget right away.",
+   "tone": "professional"
+}
+```
+MailMind will instantly give you "points" inside a reward telling you if that was a smart move or a bad decision!
+
+### Step 4: Get Your Report Card (`POST /grader`)
+Once your AI processes every single email in the inbox, you call the grader. MailMind will grade your efficiency, accuracy, and tone to give you a final score between `0.0` and `1.0`.
+
+---
+
+## 💡 3. Quick Tips for Making Your AI Better
+If you are writing the code that connects your AI to this interface, follow this simple flow:
+1. **Always Check the Sender**: If an email comes from the CEO, make sure your bot chooses a `formal` tone!
+2. **Don't Forget to Delete Spam**: You win points for spotting junk mail and deleting it immediately. 
+3. **Watch Out for Injections (Hard Mode)**: Sometimes a new, urgent email pushes its way to the top of the pile. Write your code so your AI checks for new urgent emails before blindly answering old ones.
