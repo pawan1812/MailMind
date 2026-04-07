@@ -1,6 +1,6 @@
-# openenv.yaml — MailMind v2.0 OpenEnv Specification
+# openenv.yaml — MailMind v1.0.0 OpenEnv Specification
 name: mailmind
-version: '2.0.0'
+version: '1.0.0'
 description: >
   Full enterprise email triage and response environment.
   An AI agent classifies, replies, archives, flags, and schedules
@@ -52,6 +52,40 @@ action_schema:
   followup_days: integer [optional] range[1,30]
   followup_note: string [optional] max_length:200
   flag_reason: string [optional] enum[vip, legal, urgent, awaiting_reply, needs_review]
+
+observation_schema:
+  episode_id: string
+  task_id: string
+  step: integer
+  current_email:
+    email_id: string
+    subject: string
+    sender: string
+    sender_email: string
+    sender_domain: string
+    sender_importance: string
+    body: string
+    received_at: string
+    has_attachment: boolean
+    attachment_hint: string [optional]
+    deadline_hint: string [optional]
+    cc_count: integer
+    is_reply_to: string [optional]
+    injected: boolean
+  inbox_summary:
+    total_emails: integer
+    unread_count: integer
+    flagged_count: integer
+    processed_count: integer
+    injections_pending: integer
+    categories: map[string, integer]
+    step_budget_remaining: integer
+    urgent_count: integer
+    high_priority_count: integer
+  recent_actions: list[string]
+  episode_score: float
+  done: boolean
+  message: string [optional]
 
 reward:
   range: [-0.5, 0.5]

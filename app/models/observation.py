@@ -1,4 +1,9 @@
-"""Observation, Email, Thread, InboxSummary — PRD §6.1 compliant."""
+"""Observation, Email, Thread, InboxSummary — OpenEnv compliant typed models.
+
+These Pydantic v2 models define the complete observation space returned by
+reset() and step(). Every field is typed and documented so agents can
+programmatically inspect what information is available.
+"""
 
 from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
@@ -36,7 +41,12 @@ class EmailThread(BaseModel):
     message_count: int
 
 class Email(BaseModel):
-    """A single email in the inbox — the core observation unit."""
+    """A single email in the inbox — the core observation unit.
+
+    Contains all information an agent needs to decide what action to take:
+    sender identity and importance, full body text, thread context,
+    deadline hints, and attachment metadata.
+    """
     email_id: str
     subject: str
     sender: str
@@ -61,7 +71,7 @@ class Email(BaseModel):
         return v
 
 class InboxSummary(BaseModel):
-    """High-level inbox statistics shown to the agent."""
+    """High-level inbox statistics shown to the agent each step."""
     total_emails: int
     unread_count: int
     flagged_count: int = 0
@@ -69,10 +79,20 @@ class InboxSummary(BaseModel):
     injections_pending: int = 0
     categories: Dict[str, int] = {}
     step_budget_remaining: int = 0
+    urgent_count: int = 0
+    high_priority_count: int = 0
 
 class Observation(BaseModel):
-    """Full OpenEnv-compliant observation."""
+    """Full OpenEnv-compliant observation returned by reset() and step().
+
+    The observation provides the agent with:
+    - Current email to process (with full context)
+    - Inbox-level statistics
+    - History of recent actions and their rewards
+    - Episode progress and termination status
+    """
     episode_id: str
+    task_id: str = 'classify_inbox'
     step: int
     current_email: Optional[Email] = None
     inbox_summary: InboxSummary

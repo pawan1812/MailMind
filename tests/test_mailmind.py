@@ -1,4 +1,4 @@
-"""Pytest test suite for MailMind v2.0 — unit + integration tests."""
+"""Pytest test suite for MailMind v1.0.0 — unit + integration tests."""
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -17,7 +17,7 @@ class TestHealthEndpoint:
 
     def test_version(self):
         data = client.get("/health").json()
-        assert data["version"] == "2.0.0"
+        assert data["version"] == "1.0.0"
 
     def test_status_healthy(self):
         data = client.get("/health").json()
@@ -71,7 +71,7 @@ class TestOpenenvYaml:
         assert "mailmind" in client.get("/openenv.yaml").text.lower()
 
     def test_contains_version(self):
-        assert "2.0.0" in client.get("/openenv.yaml").text
+        assert "1.0.0" in client.get("/openenv.yaml").text
 
 
 # ═══════════════════════════════════════════════════════════════════

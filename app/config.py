@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # App
     app_name: str = "MailMind OpenEnv"
-    app_version: str = "2.0.0"
+    app_version: str = "1.0.0"
     debug: bool = False
     log_level: str = "info"
 

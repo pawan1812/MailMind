@@ -1,4 +1,15 @@
-"""MailMindEnv — Core environment class. PRD §8.2."""
+"""MailMindEnv — Core environment class implementing the OpenEnv spec.
+
+Implements the standard OpenEnv interface:
+  - reset(task_id, seed) → Observation
+  - step(action)         → StepResponse(observation, reward, done, info)
+  - state()              → Current episode state dict
+  - grade()              → GraderResult with score in [0.0, 1.0]
+
+The environment simulates enterprise email management across three difficulty
+levels.  State is fully encapsulated in EpisodeState so reset() always produces
+a clean slate.
+"""
 
 import uuid
 from typing import Optional, Dict
@@ -27,7 +38,11 @@ GRADER_WEIGHTS = {
 
 
 class MailMindEnv:
-    """Core OpenEnv environment. One instance per session."""
+    """Core OpenEnv environment. One instance per session.
+
+    Thread-safety: each session gets its own MailMindEnv instance via the
+    session pool in dependencies.py. No shared mutable state across sessions.
+    """
 
     def __init__(self, session_id: str = 'default'):
         self.session_id = session_id
@@ -36,7 +51,15 @@ class MailMindEnv:
         self.injector = DynamicInjector()
 
     def reset(self, task_id: str = 'classify_inbox', seed: Optional[int] = None) -> Observation:
-        """Start a fresh episode."""
+        """Start a fresh episode.
+
+        Args:
+            task_id: One of 'classify_inbox', 'draft_replies', 'manage_inbox'
+            seed: Random seed for deterministic inbox generation
+
+        Returns:
+            Initial observation with first email to process
+        """
         config = TASK_CONFIGS.get(task_id)
         if not config:
             raise ValueError(f"Unknown task: {task_id}. Must be one of {list(TASK_CONFIGS.keys())}")
@@ -58,7 +81,14 @@ class MailMindEnv:
         return self._build_observation()
 
     def step(self, action: Action) -> StepResponse:
-        """Process one agent action."""
+        """Process one agent action.
+
+        Args:
+            action: Typed Action with action_type and relevant fields
+
+        Returns:
+            StepResponse with observation, reward, done flag, and info dict
+        """
         if self.episode is None:
             raise RuntimeError('Call reset() before step()')
         if self.episode.done:
@@ -97,43 +127,64 @@ class MailMindEnv:
             observation=obs.model_dump() if not self.episode.done else None,
             reward=reward,
             done=self.episode.done,
-            info={'step': self.episode.step, 'budget_remaining': self.episode.max_steps - self.episode.step}
+            info={
+                'step': self.episode.step,
+                'budget_remaining': self.episode.max_steps - self.episode.step,
+                'emails_processed': len(self.episode.processed_emails),
+                'emails_total': len(self.episode.inbox),
+            }
         )
 
     def state(self) -> dict:
+        """Return current episode state for debugging and monitoring."""
         if self.episode is None:
             return {'status': 'no_active_episode'}
+        ep = self.episode
         return {
-            'episode_id': self.episode.episode_id,
-            'task_id': self.episode.task_id,
-            'step': self.episode.step,
-            'max_steps': self.episode.max_steps,
-            'done': self.episode.done,
-            'cumulative_reward': self.episode.cumulative_reward,
-            'classifications': self.episode.classifications,
-            'drafts_count': len(self.episode.drafts),
-            'archives_count': len(self.episode.archives),
-            'processed_count': len(self.episode.processed_emails),
+            'episode_id': ep.episode_id,
+            'task_id': ep.task_id,
+            'step': ep.step,
+            'max_steps': ep.max_steps,
+            'done': ep.done,
+            'cumulative_reward': ep.cumulative_reward,
+            'classifications': ep.classifications,
+            'drafts_count': len(ep.drafts),
+            'archives_count': len(ep.archives),
+            'deletions_count': len(ep.deletions),
+            'flags_count': len(ep.flags),
+            'followups_count': len(ep.followups),
+            'processed_count': len(ep.processed_emails),
+            'redundant_actions': ep.redundant_actions,
+            'injected_count': len(ep.injected_emails),
+            'injection_handled_count': len(ep.injection_handled),
         }
 
     def grade(self) -> GraderResult:
-        """Grade the completed episode using task-specific graders."""
+        """Grade the current episode using task-specific modular graders.
+
+        Returns a GraderResult with:
+        - final_score in [0.0, 1.0]
+        - component_scores per grading dimension
+        - weighted_scores showing contribution to final
+        - penalties deducted
+        - episode_bonuses earned
+        """
         if self.episode is None:
             raise RuntimeError('No episode to grade')
 
         ep = self.episode
         gt = ep.ground_truth
 
-        # Use modular graders
+        # Use modular graders (preferred — they have richer output)
         from app.core.graders import GRADERS
         grader_cls = GRADERS.get(ep.task_id)
         if grader_cls:
             grader = grader_cls()
-            result = grader.grade(ep)
+            grader_result = grader.grade(ep)
         else:
-            result = {'score': 0.0}
+            grader_result = {'score': 0.0}
 
-        # Compute component scores using both inline and module results
+        # Compute component scores via inline methods (for GraderResult structure)
         weights = GRADER_WEIGHTS.get(ep.task_id, GRADER_WEIGHTS['classify_inbox'])
 
         cls_score = self._grade_classifications(ep, gt)
@@ -162,26 +213,33 @@ class MailMindEnv:
         missed = sum(1 for eid, g in gt.items()
                      if g.get('deadline_hint') and eid not in ep.processed_emails)
         deadline_pen = min(0.10, missed * 0.02)
+        wrong_del = [d for d in ep.deletions
+                     if gt.get(d, {}).get('category') not in ('spam', 'newsletter')]
+        delete_pen = min(0.15, len(wrong_del) * 0.05)
 
         penalties = {
             'redundant_steps': round(waste_pen, 4),
             'missed_deadlines': round(deadline_pen, 4),
-            'wrong_deletes': round(len([d for d in ep.deletions
-                                        if gt.get(d, {}).get('category') not in ('spam', 'newsletter')]) * 0.05, 4),
+            'wrong_deletes': round(delete_pen, 4),
         }
 
-        # Episode bonuses (PRD §5.2)
+        # Episode bonuses
         completion = len(ep.processed_emails) / len(ep.inbox) if ep.inbox else 0
         bonus = 0.0
+        episode_bonuses = {}
         if completion >= 0.95:
-            bonus += 0.05  # Inbox completion
-        wrong_del = [d for d in ep.deletions if gt.get(d, {}).get('category') not in ('spam', 'newsletter')]
+            bonus += 0.05
+            episode_bonuses['inbox_completion'] = 0.05
         if not wrong_del:
-            bonus += 0.02  # Zero wrong deletions
+            bonus += 0.02
+            episode_bonuses['zero_wrong_deletes'] = 0.02
         if ep.step < ep.max_steps * 0.7 and completion >= 0.90:
-            bonus += 0.03  # Time efficiency
+            bonus += 0.03
+            episode_bonuses['time_efficiency'] = 0.03
+        episode_bonuses['total_bonus'] = round(bonus, 4)
 
-        final_score = max(0.0, min(1.0, final + bonus - waste_pen - deadline_pen))
+        total_penalty = waste_pen + deadline_pen + delete_pen
+        final_score = max(0.0, min(1.0, final + bonus - total_penalty))
 
         return GraderResult(
             episode_id=ep.episode_id,
@@ -190,6 +248,7 @@ class MailMindEnv:
             component_scores=component_scores,
             weighted_scores=weighted,
             penalties=penalties,
+            episode_bonuses=episode_bonuses,
             total_steps_used=ep.step,
             step_budget=ep.max_steps,
             efficiency_ratio=round(ep.step / ep.max_steps, 4) if ep.max_steps > 0 else 0.0,
@@ -260,11 +319,18 @@ class MailMindEnv:
         current = ep.current_email()
 
         # Build category counts
-        cats = {}
+        cats: Dict[str, int] = {}
+        urgent_count = 0
+        high_count = 0
         for em in ep.inbox:
             gt = ep.ground_truth.get(em.email_id, {})
             c = gt.get('category', 'other')
             cats[c] = cats.get(c, 0) + 1
+            p = gt.get('priority', 'low')
+            if p == 'urgent':
+                urgent_count += 1
+            elif p == 'high':
+                high_count += 1
 
         inj_pending = len(ep.injected_emails - ep.injection_handled) if ep.task_id == 'manage_inbox' else 0
 
@@ -276,10 +342,13 @@ class MailMindEnv:
             injections_pending=inj_pending,
             categories=cats,
             step_budget_remaining=ep.max_steps - ep.step,
+            urgent_count=urgent_count,
+            high_priority_count=high_count,
         )
 
         return Observation(
             episode_id=ep.episode_id,
+            task_id=ep.task_id,
             step=ep.step,
             current_email=current,
             inbox_summary=summary,
