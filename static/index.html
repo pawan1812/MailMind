@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailMind UI — OpenEnv Agent Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="glass-container">
+        <!-- Top Navigation -->
+        <header class="top-nav">
+            <div class="logo">
+                <span class="emoji">📧</span> MailMind <span class="badge">v1.0</span>
+            </div>
+            <div class="controls">
+                <select id="task-selector" class="glass-button">
+                    <option value="classify_inbox">🟢 Classify (Easy)</option>
+                    <option value="draft_replies">🟡 Draft Replies (Medium)</option>
+                    <option value="manage_inbox">🔴 Manage (Hard)</option>
+                </select>
+                <button id="btn-reset" class="glass-button primary">Start Mission</button>
+                <button id="btn-grade" class="glass-button secondary disabled" disabled>Get Grade</button>
+            </div>
+            <div class="score-card">
+                Score: <span id="current-score">0.00</span>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="dashboard">
+            
+            <!-- Left Panel: Inbox Stats -->
+            <aside class="sidebar">
+                <h3>Inbox Summary</h3>
+                <div class="stat-box">
+                    <span class="label">Total Emails</span>
+                    <span class="value" id="stat-total">--</span>
+                </div>
+                <div class="stat-box">
+                    <span class="label">Unread</span>
+                    <span class="value highlight-red" id="stat-unread">--</span>
+                </div>
+                <div class="stat-box">
+                    <span class="label">Processed</span>
+                    <span class="value highlight-green" id="stat-processed">--</span>
+                </div>
+                <div class="stat-box">
+                    <span class="label">Steps Left</span>
+                    <span class="value" id="stat-budget">--</span>
+                </div>
+
+                <div class="agent-log" id="agent-log">
+                    <p class="sys-msg">System awaiting start...</p>
+                </div>
+            </aside>
+
+            <!-- Center Panel: Current Email -->
+            <section class="email-viewer">
+                <div class="email-header" id="email-header">
+                    <h2>Select <i>Start Mission</i> to intercept emails.</h2>
+                </div>
+                <div class="email-meta" id="email-meta">
+                    <span class="meta-item"><strong>From:</strong> <span id="em-sender">--</span></span>
+                    <span class="meta-item"><strong>Date:</strong> <span id="em-date">--</span></span>
+                    <span class="meta-item"><strong>Deadline:</strong> <span id="em-deadline" style="color: #ff5b5b;">--</span></span>
+                </div>
+                <div class="email-body" id="email-body">
+                    <p class="placeholder-text">Waiting for connection...</p>
+                </div>
+                <!-- Thread History -->
+                <div class="thread-history" id="thread-history" style="display: none;">
+                    <h4>Thread Context</h4>
+                    <div id="thread-content"></div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Actions -->
+            <aside class="action-panel">
+                <h3>Agent Actions</h3>
+                <p class="action-desc">Decide the fate of the current email:</p>
+                
+                <div class="action-grid" id="action-controls">
+                    <button class="action-btn" onclick="submitAction('classify_email', {priority: 'high', category: 'action_required'})">🏷️ Classify (High)</button>
+                    <button class="action-btn" onclick="submitAction('classify_email', {priority: 'low', category: 'fyi'})">🏷️ Classify (Low)</button>
+                    
+                    <button class="action-btn" onclick="draftReplyAction()">✍️ Draft Reply</button>
+                    
+                    <button class="action-btn danger" onclick="submitAction('delete', {})">🗑️ Delete</button>
+                    <button class="action-btn success" onclick="submitAction('archive', {})">🗄️ Archive</button>
+                    
+                    <button class="action-btn warning" onclick="submitAction('schedule_followup', {followup_days: 3, followup_note: 'Checking in'})">📅 Schedule (3 Days)</button>
+                    <button class="action-btn" onclick="submitAction('skip', {})">⏭️ Skip</button>
+                </div>
+
+                <div id="draft-slider" class="draft-slider hidden">
+                    <textarea id="reply-text" placeholder="Type your reply here..."></textarea>
+                    <select id="reply-tone" class="glass-select">
+                        <option value="professional">Professional</option>
+                        <option value="formal">Formal</option>
+                        <option value="friendly">Friendly</option>
+                    </select>
+                    <button class="glass-button submit-draft" onclick="submitDraft()">Send Reply</button>
+                </div>
+
+                <!-- Reward Toast Container -->
+                <div id="toast-container" class="toast-container"></div>
+            </aside>
+
+        </main>
+    </div>
+
+    <!-- End Game Modal -->
+    <div id="grade-modal" class="modal hidden">
+        <div class="modal-content glass-container">
+            <h2>🏆 Evaluation Complete</h2>
+            <h1 id="final-score-display">0.00</h1>
+            <p>Your agent logic managed this inbox environment.</p>
+            <div id="grade-breakdown"></div>
+            <button class="glass-button primary" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

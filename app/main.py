@@ -56,10 +56,20 @@ def create_app() -> FastAPI:
     app.include_router(baseline_routes.router)
     app.include_router(health_routes.router)
 
-    # Root redirect → Swagger UI (HuggingFace opens / by default)
+    from fastapi.staticfiles import StaticFiles
+    import os
+    
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+
+    # Mount static files
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    # Root -> Serve beautiful UI instead of raw Swagger
     @app.get('/', include_in_schema=False)
     def root():
-        return RedirectResponse(url='/docs')
+        return FileResponse(os.path.join(static_dir, 'index.html'))
 
     # Serve openenv.yaml
     @app.get('/openenv.yaml', include_in_schema=False)
