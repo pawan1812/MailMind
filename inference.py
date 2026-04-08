@@ -21,19 +21,15 @@ import json
 import textwrap
 from typing import List, Optional
 
-try:
-    import httpx
-    from openai import OpenAI
-except ImportError:
-    print("ERROR: pip install openai httpx")
-    sys.exit(1)
+import httpx
+from openai import OpenAI
 
 # ── Required Hackathon Environment Variables ─────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Optional — if you use from_docker_image():
+# Optional - if you use from_docker_image():
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 BENCHMARK = "mailmind"
