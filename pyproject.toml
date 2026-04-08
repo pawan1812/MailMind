@@ -16,8 +16,12 @@ dependencies = [
     "faker",
     "sentence-transformers",
     "httpx",
-    "openai"
+    "openai",
+    "openenv-core>=0.2.0"
 ]
+
+[project.scripts]
+mailmind-server = "server.app:main"
 
 [project.optional-dependencies]
 dev = [
