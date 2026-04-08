@@ -1,147 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MailMind UI — OpenEnv Agent Interface</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>MailMind — AI Email Agent Playground</title>
+    <meta name="description" content="Interactive OpenEnv reinforcement learning playground for AI email triage and response agents. Classify, reply, archive, and manage a simulated inbox.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-    <div class="glass-container">
-        <!-- Top Navigation -->
-        <header class="top-nav">
-            <div class="logo">
-                <span class="emoji">📧</span> MailMind <span class="badge">v1.0</span>
+
+    <!-- ═══ ONBOARDING SPLASH ═══ -->
+    <div id="splash" class="splash">
+        <div class="splash-inner">
+            <div class="splash-icon">
+                <div class="pulse-ring"></div>
+                <span>📧</span>
             </div>
-            <div class="controls">
-                <select id="task-selector" class="glass-button">
-                    <option value="classify_inbox">🟢 Classify (Easy)</option>
-                    <option value="draft_replies">🟡 Draft Replies (Medium)</option>
-                    <option value="manage_inbox">🔴 Manage (Hard)</option>
-                </select>
-                <button id="btn-reset" class="glass-button primary"><i class="fa-solid fa-rocket"></i> Start
-                    Mission</button>
-                <button id="btn-grade" class="glass-button secondary disabled" disabled><i
-                        class="fa-solid fa-ranking-star"></i> Get Grade</button>
+            <h1 class="splash-title">MailMind</h1>
+            <p class="splash-subtitle">AI Email Agent Playground</p>
+            <div class="splash-tasks">
+                <button class="task-card" data-task="classify_inbox" id="task-card-easy">
+                    <span class="task-difficulty easy">Easy</span>
+                    <h3>📂 Classify Inbox</h3>
+                    <p>Sort 15 emails by priority &amp; category</p>
+                    <div class="task-meta"><span>20 steps</span><span>4 action types</span></div>
+                </button>
+                <button class="task-card" data-task="draft_replies" id="task-card-medium">
+                    <span class="task-difficulty medium">Medium</span>
+                    <h3>✍️ Draft Replies</h3>
+                    <p>Classify &amp; compose context-aware replies</p>
+                    <div class="task-meta"><span>30 steps</span><span>5 action types</span></div>
+                </button>
+                <button class="task-card" data-task="manage_inbox" id="task-card-hard">
+                    <span class="task-difficulty hard">Hard</span>
+                    <h3>🧠 Full Management</h3>
+                    <p>Complete lifecycle with dynamic injections</p>
+                    <div class="task-meta"><span>60 steps</span><span>8 action types</span></div>
+                </button>
             </div>
-            <div class="score-card">
-                Score: <span id="current-score">0.00</span>
+            <div class="splash-footer">
+                <div class="splash-health" id="splash-health">
+                    <span class="health-dot"></span> Checking server...
+                </div>
+                <a href="/docs" class="api-link" target="_blank">🔗 API Docs (Swagger)</a>
             </div>
-        </header>
-
-        <!-- Main Layout -->
-        <main class="dashboard">
-
-            <!-- Left Panel: Inbox Stats -->
-            <aside class="sidebar">
-                <h3><i class="fa-solid fa-chart-pie"></i> Inbox Summary</h3>
-                <div class="stat-box">
-                    <span class="label">Total Emails</span>
-                    <span class="value" id="stat-total">--</span>
-                </div>
-                <div class="stat-box">
-                    <span class="label">Unread</span>
-                    <span class="value highlight-red" id="stat-unread">--</span>
-                </div>
-                <div class="stat-box">
-                    <span class="label">Processed</span>
-                    <span class="value highlight-green" id="stat-processed">--</span>
-                </div>
-                <div class="stat-box">
-                    <span class="label">Steps Left</span>
-                    <span class="value" id="stat-budget">--</span>
-                </div>
-
-                <div class="agent-log" id="agent-log">
-                    <p class="sys-msg"><i class="fa-solid fa-satellite-dish"></i> System awaiting start...</p>
-                </div>
-            </aside>
-
-            <!-- Center Panel: Current Email -->
-            <section class="email-viewer">
-                <div class="email-header" id="email-header">
-                    <h2>Select <i>Start Mission</i> to intercept emails.</h2>
-                </div>
-                <div class="email-meta" id="email-meta" style="display: none;">
-                    <span class="meta-item"><strong>From:</strong> <span id="em-sender">--</span></span>
-                    <span class="meta-item"><strong>Date:</strong> <span id="em-date">--</span></span>
-                    <span class="meta-item"><strong>Deadline:</strong> <span id="em-deadline"
-                            style="color: #ff5b5b;">--</span></span>
-                </div>
-                <div class="email-body" id="email-body">
-                    <p class="placeholder-text"><i class="fa-regular fa-envelope-open fa-2x"></i><br><br>Waiting for
-                        connection...</p>
-                </div>
-                <!-- Thread History -->
-                <div class="thread-history" id="thread-history" style="display: none;">
-                    <h4><i class="fa-solid fa-timeline"></i> Thread Context</h4>
-                    <div id="thread-content"></div>
-                </div>
-            </section>
-
-            <!-- Right Panel: Actions -->
-            <aside class="action-panel">
-                <h3><i class="fa-solid fa-robot"></i> Agent Actions</h3>
-                <p class="action-desc">Decide the fate of the current email:</p>
-
-                <div class="action-grid" id="action-controls">
-                    <button class="action-btn"
-                        onclick="submitAction('classify_email', {priority: 'high', category: 'action_required'})"><i
-                            class="fa-solid fa-tag w-5"></i> Classify (High)</button>
-                    <button class="action-btn"
-                        onclick="submitAction('classify_email', {priority: 'low', category: 'fyi'})"><i
-                            class="fa-solid fa-tags w-5"></i> Classify (Low)</button>
-
-                    <button class="action-btn" onclick="draftReplyAction()"><i class="fa-solid fa-pen-nib w-5"></i>
-                        Draft Reply</button>
-
-                    <button class="action-btn danger" onclick="submitAction('delete', {})"><i
-                            class="fa-solid fa-trash w-5"></i> Delete</button>
-                    <button class="action-btn success" onclick="submitAction('archive', {})"><i
-                            class="fa-solid fa-box-archive w-5"></i> Archive</button>
-
-                    <button class="action-btn warning"
-                        onclick="submitAction('schedule_followup', {followup_days: 3, followup_note: 'Checking in'})"><i
-                            class="fa-solid fa-calendar-alt w-5"></i> Schedule (3 Days)</button>
-                    <button class="action-btn" onclick="submitAction('skip', {})"><i
-                            class="fa-solid fa-forward-step w-5"></i> Skip</button>
-                </div>
-
-                <div id="draft-slider" class="draft-slider hidden">
-                    <textarea id="reply-text" placeholder="Type your reply here..."></textarea>
-                    <select id="reply-tone" class="glass-select">
-                        <option value="professional">Professional</option>
-                        <option value="formal">Formal</option>
-                        <option value="friendly">Friendly</option>
-                    </select>
-                    <button class="glass-button submit-draft" onclick="submitDraft()">Send Reply</button>
-                </div>
-
-                <!-- Reward Toast Container -->
-                <div id="toast-container" class="toast-container"></div>
-            </aside>
-
-        </main>
-    </div>
-
-    <!-- End Game Modal -->
-    <div id="grade-modal" class="modal hidden">
-        <div class="modal-content glass-container">
-            <h2>🏆 Evaluation Complete</h2>
-            <h1 id="final-score-display">0.00</h1>
-            <p>Your agent logic managed this inbox environment.</p>
-            <div id="grade-breakdown"></div>
-            <button class="glass-button primary" onclick="closeModal()">Close</button>
         </div>
     </div>
 
+    <!-- ═══ MAIN APP SHELL ═══ -->
+    <div id="app" class="app-shell hidden">
+
+        <!-- Top Bar -->
+        <header class="topbar" id="topbar">
+            <div class="topbar-left">
+                <button class="topbar-logo" onclick="goHome()" title="Back to task selector">📧 MailMind</button>
+                <span class="topbar-task" id="topbar-task">classify_inbox</span>
+                <span class="topbar-episode" id="topbar-episode"></span>
+            </div>
+            <div class="topbar-center">
+                <div class="progress-ring-wrap" title="Inbox completion">
+                    <svg class="progress-ring" viewBox="0 0 44 44">
+                        <circle class="progress-ring-bg" cx="22" cy="22" r="18"/>
+                        <circle class="progress-ring-fill" id="progress-ring-fill" cx="22" cy="22" r="18"/>
+                    </svg>
+                    <span class="progress-pct" id="progress-pct">0%</span>
+                </div>
+                <div class="topbar-stats">
+                    <div class="mini-stat" id="mini-stat-step">
+                        <span class="mini-stat-label">Step</span>
+                        <span class="mini-stat-value" id="ms-step">0</span>
+                    </div>
+                    <div class="mini-stat" id="mini-stat-budget">
+                        <span class="mini-stat-label">Budget</span>
+                        <span class="mini-stat-value" id="ms-budget">--</span>
+                    </div>
+                    <div class="mini-stat" id="mini-stat-processed">
+                        <span class="mini-stat-label">Done</span>
+                        <span class="mini-stat-value" id="ms-processed">0</span>
+                    </div>
+                    <div class="mini-stat" id="mini-stat-unread">
+                        <span class="mini-stat-label">Unread</span>
+                        <span class="mini-stat-value" id="ms-unread">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <div class="score-pill" id="score-pill">
+                    <span class="score-label">Score</span>
+                    <span class="score-value" id="live-score">0.00</span>
+                </div>
+                <button class="btn-grade" id="btn-grade" disabled>
+                    🏆 Grade
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-grid">
+
+            <!-- ─── Left: Email Viewer ─── -->
+            <section class="email-pane" id="email-pane">
+                <div class="email-empty" id="email-empty">
+                    <div class="email-empty-icon">📭</div>
+                    <h2>Loading inbox...</h2>
+                    <p>Your AI agent mission is preparing.</p>
+                </div>
+                <div class="email-card" id="email-card" style="display:none;">
+                    <div class="email-card-badge-row">
+                        <span class="email-badge importance" id="em-importance">unknown</span>
+                        <span class="email-badge" id="em-attachment" style="display:none;">📎 Attachment</span>
+                        <span class="email-badge deadline" id="em-deadline-badge" style="display:none;">⏰ <span id="em-deadline-text"></span></span>
+                    </div>
+                    <h2 class="email-subject" id="em-subject">Subject</h2>
+                    <div class="email-meta-row">
+                        <div class="email-avatar" id="em-avatar">?</div>
+                        <div class="email-meta-text">
+                            <span class="email-sender" id="em-sender">Sender</span>
+                            <span class="email-date" id="em-date">Date</span>
+                        </div>
+                        <span class="email-id-pill" id="em-id">ID</span>
+                    </div>
+                    <div class="email-body" id="em-body"></div>
+                    <div class="email-thread" id="em-thread" style="display:none;">
+                        <h4 class="thread-title">📜 Thread History</h4>
+                        <div class="thread-list" id="thread-list"></div>
+                    </div>
+                </div>
+                <!-- Done State -->
+                <div class="email-done" id="email-done" style="display:none;">
+                    <div class="done-icon">🎉</div>
+                    <h2>All Emails Processed!</h2>
+                    <p>Click <strong>🏆 Grade</strong> to see your final evaluation.</p>
+                </div>
+            </section>
+
+            <!-- ─── Right: Actions + Feedback ─── -->
+            <aside class="action-pane" id="action-pane">
+                
+                <!-- Action Selector -->
+                <div class="action-section" id="action-section">
+                    <h3 class="pane-title">Choose Action</h3>
+                    <div class="action-chips" id="action-chips">
+                        <button class="chip" data-action="classify_email" id="chip-classify">
+                            <span class="chip-icon">🏷️</span> Classify
+                        </button>
+                        <button class="chip" data-action="draft_reply" id="chip-draft">
+                            <span class="chip-icon">✍️</span> Reply
+                        </button>
+                        <button class="chip" data-action="archive" id="chip-archive">
+                            <span class="chip-icon">🗄️</span> Archive
+                        </button>
+                        <button class="chip" data-action="delete" id="chip-delete">
+                            <span class="chip-icon">🗑️</span> Delete
+                        </button>
+                        <button class="chip" data-action="flag" id="chip-flag">
+                            <span class="chip-icon">🚩</span> Flag
+                        </button>
+                        <button class="chip" data-action="schedule_followup" id="chip-followup">
+                            <span class="chip-icon">📅</span> Follow-up
+                        </button>
+                        <button class="chip" data-action="skip" id="chip-skip">
+                            <span class="chip-icon">⏭️</span> Skip
+                        </button>
+                    </div>
+
+                    <!-- Dynamic Forms -->
+                    <div class="action-form" id="form-classify" style="display:none;">
+                        <label>Priority</label>
+                        <div class="radio-group" id="priority-group">
+                            <button class="radio-pill" data-val="urgent">🔴 Urgent</button>
+                            <button class="radio-pill" data-val="high">🟠 High</button>
+                            <button class="radio-pill" data-val="medium">🟡 Medium</button>
+                            <button class="radio-pill" data-val="low">🟢 Low</button>
+                        </div>
+                        <label>Category</label>
+                        <select id="sel-category" class="form-select">
+                            <option value="">— pick category —</option>
+                            <option value="meeting_request">📅 Meeting Request</option>
+                            <option value="action_required">⚡ Action Required</option>
+                            <option value="fyi">📢 FYI</option>
+                            <option value="newsletter">📰 Newsletter</option>
+                            <option value="spam">🚫 Spam</option>
+                            <option value="invoice">💰 Invoice</option>
+                            <option value="hr">👥 HR</option>
+                            <option value="legal">⚖️ Legal</option>
+                            <option value="personal">💌 Personal</option>
+                            <option value="complaint">😤 Complaint</option>
+                            <option value="approval_needed">✅ Approval Needed</option>
+                            <option value="other">📋 Other</option>
+                        </select>
+                        <button class="btn-submit" id="btn-classify-submit" onclick="doClassify()">Submit Classification</button>
+                    </div>
+
+                    <div class="action-form" id="form-draft" style="display:none;">
+                        <label>Reply Body</label>
+                        <textarea id="txt-reply" class="form-textarea" placeholder="Write your reply here..." rows="5"></textarea>
+                        <label>Tone</label>
+                        <div class="radio-group" id="tone-group">
+                            <button class="radio-pill selected" data-val="professional">Professional</button>
+                            <button class="radio-pill" data-val="formal">Formal</button>
+                            <button class="radio-pill" data-val="friendly">Friendly</button>
+                            <button class="radio-pill" data-val="brief">Brief</button>
+                        </div>
+                        <button class="btn-submit" onclick="doDraft()">Send Draft</button>
+                    </div>
+
+                    <div class="action-form" id="form-flag" style="display:none;">
+                        <label>Flag Reason</label>
+                        <div class="radio-group" id="flag-group">
+                            <button class="radio-pill" data-val="vip">⭐ VIP</button>
+                            <button class="radio-pill" data-val="legal">⚖️ Legal</button>
+                            <button class="radio-pill" data-val="urgent">🔴 Urgent</button>
+                            <button class="radio-pill" data-val="awaiting_reply">⏳ Awaiting</button>
+                            <button class="radio-pill" data-val="needs_review">🔍 Review</button>
+                        </div>
+                        <button class="btn-submit" onclick="doFlag()">Submit Flag</button>
+                    </div>
+
+                    <div class="action-form" id="form-followup" style="display:none;">
+                        <label>Follow-up in <span id="followup-days-label">3</span> days</label>
+                        <input type="range" id="followup-range" min="1" max="30" value="3" class="form-range" oninput="document.getElementById('followup-days-label').textContent=this.value">
+                        <label>Note (optional)</label>
+                        <input type="text" id="followup-note" class="form-input" placeholder="e.g. Check for response…" maxlength="200">
+                        <button class="btn-submit" onclick="doFollowup()">Schedule Follow-up</button>
+                    </div>
+                </div>
+
+                <!-- Reward Chart -->
+                <div class="reward-section">
+                    <h3 class="pane-title">Reward Timeline</h3>
+                    <canvas id="reward-chart" height="120"></canvas>
+                </div>
+
+                <!-- Activity Feed -->
+                <div class="feed-section">
+                    <h3 class="pane-title">Activity Feed</h3>
+                    <div class="feed-list" id="feed-list">
+                        <div class="feed-item sys">System ready. Pick a task to begin.</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- ═══ GRADE MODAL ═══ -->
+    <div id="grade-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <div class="modal-header">
+                <div class="modal-trophy">🏆</div>
+                <h2>Mission Complete</h2>
+            </div>
+            <div class="modal-score-ring">
+                <svg viewBox="0 0 120 120" class="score-ring-svg">
+                    <circle cx="60" cy="60" r="52" class="score-ring-bg"/>
+                    <circle cx="60" cy="60" r="52" class="score-ring-fill" id="modal-score-ring"/>
+                </svg>
+                <span class="score-ring-text" id="modal-score-text">0.00</span>
+            </div>
+            <div class="modal-grade-label" id="modal-grade-label">Evaluating...</div>
+            <div class="modal-breakdown" id="modal-breakdown"></div>
+            <div class="modal-penalties" id="modal-penalties"></div>
+            <div class="modal-footer">
+                <div class="modal-meta" id="modal-meta"></div>
+                <button class="btn-play-again" onclick="goHome()">🔄 Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ TOAST CONTAINER ═══ -->
+    <div id="toast-container" class="toast-container"></div>
+
     <script src="/static/app.js"></script>
 </body>
-
 </html>
