@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mailmind-server = "server.app:main"
+server = "server.app:main"
 
 [project.optional-dependencies]
 dev = [
