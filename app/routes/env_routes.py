@@ -16,9 +16,11 @@ class ResetRequest(BaseModel):
 
 
 @router.post('/reset')
-def reset_env(req: ResetRequest, response: Response,
+def reset_env(response: Response,
+              req: Optional[ResetRequest] = None,
               x_session_id: Optional[str] = Header(default='default')):
     """Start a new episode."""
+    req = req or ResetRequest()
     try:
         env = get_env(x_session_id)
         obs = env.reset(task_id=req.task_id, seed=req.seed)
