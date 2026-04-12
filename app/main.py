@@ -78,6 +78,40 @@ def create_app() -> FastAPI:
         yaml_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'openenv.yaml')
         return FileResponse(yaml_path, media_type='text/yaml')
 
+    # OpenEnv metadata endpoint (required by openenv validate)
+    @app.get('/metadata')
+    def metadata():
+        return {
+            'name': 'mailmind',
+            'description': 'Email Triage & Response AI Agent — OpenEnv Reinforcement Learning Environment. '
+                           '3 tasks (easy/medium/hard), 8 action types, dense reward, deterministic graders.',
+            'version': settings.app_version,
+            'author': 'MailMind Team',
+            'tags': ['openenv', 'email', 'nlp', 'productivity', 'rl-benchmark'],
+        }
+
+    # OpenEnv schema endpoint (required by openenv validate)
+    @app.get('/schema')
+    def schema():
+        from app.models.action import Action
+        from app.models.observation import Observation
+        return {
+            'action': Action.model_json_schema(),
+            'observation': Observation.model_json_schema(),
+            'state': {
+                'type': 'object',
+                'properties': {
+                    'episode_id': {'type': 'string'},
+                    'task_id': {'type': 'string'},
+                    'step': {'type': 'integer'},
+                    'done': {'type': 'boolean'},
+                    'cumulative_reward': {'type': 'number'},
+                    'processed_emails': {'type': 'array', 'items': {'type': 'string'}},
+                    'inbox_size': {'type': 'integer'},
+                },
+            },
+        }
+
     return app
 
 app = create_app()
