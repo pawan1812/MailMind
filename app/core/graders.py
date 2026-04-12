@@ -1,6 +1,6 @@
 """Grader modules — Per-task deterministic grading logic.
 
-Each grader produces a score in [0.0, 1.0] with a full breakdown explaining
+Each grader produces a score in (0.0, 1.0) with a full breakdown explaining
 how the score was computed. Graders are DETERMINISTIC: same agent trajectory
 on the same seeded episode → identical score.
 
@@ -38,7 +38,7 @@ class ClassifyGrader:
         gt = ep.ground_truth
         total = len(gt)
         if total == 0:
-            return {'score': 0.0, 'breakdown': {}}
+            return {'score': 0.001, 'breakdown': {}}
 
         p_correct = 0
         c_correct = 0
@@ -74,7 +74,7 @@ class ClassifyGrader:
             score *= (0.5 + 0.5 * coverage)  # At 50% coverage → 75% of raw score
 
         return {
-            'score': round(min(1.0, max(0.0, score)), 4),
+            'score': round(min(0.999, max(0.001, score)), 4),
             'priority_accuracy': round(p_correct / total, 4),
             'category_accuracy': round(c_correct / total, 4),
             'coverage': round(coverage, 4),
@@ -102,7 +102,7 @@ class ReplyGrader:
         reply_needed = {eid: g for eid, g in gt.items() if g.get('requires_reply')}
 
         if not reply_needed:
-            return {'score': 1.0, 'breakdown': {}}
+            return {'score': 0.999, 'breakdown': {}}
 
         # Sub-score: classification quality (blended in)
         cls_sub = ClassifyGrader().grade(ep)
@@ -142,7 +142,7 @@ class ReplyGrader:
                 if body and len(body.split()) < 3:
                     draft_score -= 0.05
 
-                entry['score'] = round(min(1.0, max(0.0, draft_score)), 2)
+                entry['score'] = round(min(0.999, max(0.001, draft_score)), 2)
                 total_score += entry['score']
 
             breakdown[eid] = entry
@@ -153,7 +153,7 @@ class ReplyGrader:
         final = cls_sub['score'] * 0.40 + reply_score * 0.60
 
         return {
-            'score': round(min(1.0, max(0.0, final)), 4),
+            'score': round(min(0.999, max(0.001, final)), 4),
             'classification_sub_score': cls_sub['score'],
             'reply_sub_score': round(reply_score, 4),
             'replies_needed': len(reply_needed),
@@ -213,7 +213,7 @@ class WorkflowGrader:
         weighted_score -= penalties['total_penalty']
 
         return {
-            'score': round(min(1.0, max(0.0, weighted_score)), 4),
+            'score': round(min(0.999, max(0.001, weighted_score)), 4),
             'sub_scores': {
                 'classification': cls['score'],
                 'reply': reply['score'],
@@ -230,7 +230,7 @@ class WorkflowGrader:
         """Score archiving decisions against ground truth."""
         should = {eid for eid, g in gt.items() if g.get('should_archive')}
         if not should:
-            return {'score': 1.0, 'expected': 0, 'correct': 0, 'false': 0}
+            return {'score': 0.999, 'expected': 0, 'correct': 0, 'false': 0}
         correct = len(set(ep.archives) & should)
         false_arch = len(set(ep.archives) - should)
         score = max(0.0, (correct - false_arch * 0.5) / len(should))
@@ -243,7 +243,7 @@ class WorkflowGrader:
         """Score follow-up scheduling decisions."""
         needed = {eid for eid, g in gt.items() if g.get('needs_followup')}
         if not needed:
-            return {'score': 1.0, 'expected': 0, 'scheduled': 0}
+            return {'score': 0.999, 'expected': 0, 'scheduled': 0}
         correct = 0
         for eid in ep.followups:
             if eid in needed:
@@ -262,7 +262,7 @@ class WorkflowGrader:
     def _grade_injections(self, ep: EpisodeState) -> dict:
         """Score handling of dynamically injected urgent emails."""
         if not ep.injected_emails:
-            return {'score': 1.0, 'injected': 0, 'handled': 0}
+            return {'score': 0.999, 'injected': 0, 'handled': 0}
         handled = ep.injection_handled & ep.injected_emails
         return {
             'score': round(len(handled) / len(ep.injected_emails), 4),

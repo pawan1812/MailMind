@@ -4,7 +4,7 @@ Implements the standard OpenEnv interface:
   - reset(task_id, seed) → Observation
   - step(action)         → StepResponse(observation, reward, done, info)
   - state()              → Current episode state dict
-  - grade()              → GraderResult with score in [0.0, 1.0]
+  - grade()              → GraderResult with score in (0.0, 1.0)
 
 The environment simulates enterprise email management across three difficulty
 levels.  State is fully encapsulated in EpisodeState so reset() always produces
@@ -239,7 +239,8 @@ class MailMindEnv:
         episode_bonuses['total_bonus'] = round(bonus, 4)
 
         total_penalty = waste_pen + deadline_pen + delete_pen
-        final_score = max(0.0, min(1.0, final + bonus - total_penalty))
+        # Clamp to open interval (0, 1) — competition requires strictly between 0 and 1
+        final_score = max(0.001, min(0.999, final + bonus - total_penalty))
 
         return GraderResult(
             episode_id=ep.episode_id,
@@ -361,7 +362,7 @@ class MailMindEnv:
     def _grade_classifications(self, ep: EpisodeState, gt: dict) -> float:
         total = len(gt)
         if total == 0:
-            return 0.0
+            return 0.001
         score = 0.0
         for eid, truth in gt.items():
             pred = ep.classifications.get(eid)
@@ -376,7 +377,7 @@ class MailMindEnv:
     def _grade_replies(self, ep: EpisodeState, gt: dict) -> float:
         reply_needed = [eid for eid, g in gt.items() if g.get('requires_reply')]
         if not reply_needed:
-            return 1.0
+            return 0.999
         score = 0.0
         for eid in reply_needed:
             draft = ep.drafts.get(eid)
@@ -391,7 +392,7 @@ class MailMindEnv:
     def _grade_archives(self, ep: EpisodeState, gt: dict) -> float:
         should = {eid for eid, g in gt.items() if g.get('should_archive')}
         if not should:
-            return 1.0
+            return 0.999
         correct = len(set(ep.archives) & should)
         false_arch = len(set(ep.archives) - should)
         return max(0.0, (correct - false_arch * 0.5) / len(should))
@@ -399,12 +400,12 @@ class MailMindEnv:
     def _grade_followups(self, ep: EpisodeState, gt: dict) -> float:
         needed = {eid for eid, g in gt.items() if g.get('needs_followup')}
         if not needed:
-            return 1.0
+            return 0.999
         correct = sum(1 for eid in ep.followups if eid in needed)
         return correct / len(needed)
 
     def _grade_injections(self, ep: EpisodeState) -> float:
         if not ep.injected_emails:
-            return 1.0
+            return 0.999
         handled = ep.injection_handled & ep.injected_emails
         return len(handled) / len(ep.injected_emails)
