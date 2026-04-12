@@ -254,8 +254,9 @@ def run_task(client: OpenAI, http: httpx.Client, task_id: str) -> None:
         if grade_resp.status_code == 200:
             score = grade_resp.json().get("final_score", 0.0)
 
-        # Clamp to open interval (0, 1) — competition requires strictly between 0 and 1
-        score = min(0.999, max(0.001, score))
+        # Clamp to open interval (0, 1) — bounds chosen to survive :.2f formatting
+        # 0.01 formats as "0.01", 0.99 formats as "0.99" — both strictly in (0, 1)
+        score = min(0.99, max(0.01, score))
         success = score >= 0.1
 
     except Exception as e:
